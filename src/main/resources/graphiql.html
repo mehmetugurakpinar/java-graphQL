@@ -4,8 +4,9 @@
     <meta charset="UTF-8"/>
     <title>GraphiQL — Blog GraphQL</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <!-- GraphiQL styles (CDN — requires internet at runtime) -->
-    <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css"/>
+    <!-- GraphiQL styles (CDN — requires internet at runtime). Pinned to v3:
+         the v5 line dropped the UMD bundle and requires React 19 + ESM. -->
+    <link rel="stylesheet" href="https://unpkg.com/graphiql@3.8.3/graphiql.min.css"/>
     <style>html, body, #graphiql { height: 100%; margin: 0; }</style>
 </head>
 <body>
@@ -13,7 +14,7 @@
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+<script crossorigin src="https://unpkg.com/graphiql@3.8.3/graphiql.min.js"></script>
 
 <script>
     // GraphiQL fetcher: query/mutation -> POST /graphql, subscription -> WS /subscriptions
