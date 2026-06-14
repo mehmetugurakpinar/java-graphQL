@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>GraphiQL — Blog GraphQL</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <!-- GraphiQL styles (CDN — requires internet at runtime) -->
+    <link rel="stylesheet" href="https://unpkg.com/graphiql/graphiql.min.css"/>
+    <style>html, body, #graphiql { height: 100%; margin: 0; }</style>
+</head>
+<body>
+<div id="graphiql">Loading...</div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/graphiql/graphiql.min.js"></script>
+
+<script>
+    // GraphiQL fetcher: query/mutation -> POST /graphql, subscription -> WS /subscriptions
+    const wsProto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const fetcher = GraphiQL.createFetcher({
+        url: '/graphql',
+        subscriptionUrl: wsProto + location.host + '/subscriptions'
+    });
+
+    const defaultQuery = `# Example query: select only the fields you want
+query Example {
+  posts(filter: { status: PUBLISHED }, limit: 3) {
+    id
+    title
+    shoutTitle          # UPPER-CASED via the @uppercase directive
+    createdAt           # the custom DateTime scalar
+    author { name role }
+    comments { text author { name } }
+    tags { name }
+  }
+}
+
+# To try a mutation + subscription, open a new tab in the top-left.
+# subscription S { commentAdded(postId: "p1") { id text author { name } } }
+# mutation M { addComment(input: {postId: "p1", text: "Hello!"}) { id } }`;
+
+    const root = ReactDOM.createRoot(document.getElementById('graphiql'));
+    root.render(React.createElement(GraphiQL, { fetcher: fetcher, defaultQuery: defaultQuery }));
+</script>
+</body>
+</html>

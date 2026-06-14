@@ -1,0 +1,197 @@
+# =============================================================================
+#  schema.graphqls  —  GraphQL Type System / Schema
+# =============================================================================
+#  This file gathers ALL of GraphQL's schema-side features in one place, for
+#  teaching purposes. graphql-java reads this text using the "schema-first" approach.
+#
+#  In the schema, lines starting with "#" are comments. Text written with triple
+#  quotes (""" ... """) becomes a "description" that is exposed via introspection —
+#  it is shown as documentation in GraphiQL.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1) CUSTOM SCALAR
+# -----------------------------------------------------------------------------
+# GraphQL's built-in scalars: Int, Float, String, Boolean, ID.
+# We can also define our own scalar. Here, DateTime for ISO-8601 date/time.
+# Its behavior is defined on the Java side via DateTimeScalar (Coercing).
+"""Date/time in ISO-8601 format. e.g. 2026-06-14T08:30:00Z"""
+scalar DateTime
+
+
+# -----------------------------------------------------------------------------
+# 2) CUSTOM DIRECTIVE definition
+# -----------------------------------------------------------------------------
+# Directives add behavior to the schema/query. Here we define the @uppercase
+# directive, which converts a field's value to upper case (on FIELD_DEFINITION).
+# Its behavior is applied in Java via UpperCaseDirective (SchemaDirectiveWiring).
+directive @uppercase on FIELD_DEFINITION
+
+
+# -----------------------------------------------------------------------------
+# 3) ENUM
+# -----------------------------------------------------------------------------
+"""The publication status of a post."""
+enum PostStatus {
+    DRAFT      # draft
+    PUBLISHED  # published
+    ARCHIVED   # archived
+}
+
+"""User role."""
+enum Role {
+    READER
+    AUTHOR
+    ADMIN
+}
+
+
+# -----------------------------------------------------------------------------
+# 4) INTERFACE
+# -----------------------------------------------------------------------------
+# A contract for types that share common fields. Below, Author/Post/Comment all
+# "implement" Node; this enables a global "node(id)" query and inline-fragment
+# usage (... on Post).
+"""Anything with a unique id is a Node (the Relay pattern)."""
+interface Node {
+    id: ID!
+}
+
+
+# -----------------------------------------------------------------------------
+# 5) OBJECT TYPEs + field resolvers
+# -----------------------------------------------------------------------------
+"""A blog author / user."""
+type Author implements Node {
+    id: ID!
+    name: String!
+    email: String!
+    role: Role!
+    """This author's posts (related field -> field resolver + DataLoader)."""
+    posts: [Post!]!
+}
+
+"""A blog post."""
+type Post implements Node {
+    id: ID!
+    title: String!
+    content: String!
+    status: PostStatus!
+    createdAt: DateTime!
+    "The upper-cased title (via the custom @uppercase directive)."
+    shoutTitle: String! @uppercase
+    """An example of a legacy field — shows up as 'deprecated' in introspection."""
+    summary: String @deprecated(reason: "Use 'content' instead.")
+    """The post's author (related field -> resolved via the author DataLoader)."""
+    author: Author!
+    """The post's comments (related field -> resolved via the comments DataLoader)."""
+    comments: [Comment!]!
+    """The post's tags."""
+    tags: [Tag!]!
+}
+
+"""A comment made on a post."""
+type Comment implements Node {
+    id: ID!
+    text: String!
+    createdAt: DateTime!
+    author: Author!
+    post: Post!
+}
+
+"""A tag."""
+type Tag implements Node {
+    id: ID!
+    name: String!
+}
+
+
+# -----------------------------------------------------------------------------
+# 6) UNION
+# -----------------------------------------------------------------------------
+# A search result may be one of several types. The client uses inline fragments
+# (... on Post { title }) to distinguish which type was returned.
+"""The union of types that a search may return."""
+union SearchResult = Author | Post | Comment
+
+
+# -----------------------------------------------------------------------------
+# 7) INPUT TYPEs — for mutation arguments
+# -----------------------------------------------------------------------------
+"""Input used to filter posts (all fields optional)."""
+input PostFilter {
+    status: PostStatus
+    authorId: ID
+    "Text contained in the title (substring match)."
+    titleContains: String
+    "Posts having any of these tags."
+    tag: String
+}
+
+"""Input for creating a new post."""
+input CreatePostInput {
+    title: String!
+    content: String!
+    authorId: ID!
+    status: PostStatus = DRAFT   # example of a default value
+    tagNames: [String!] = []
+}
+
+"""Input for adding a comment."""
+input AddCommentInput {
+    postId: ID!
+    text: String!
+}
+
+
+# -----------------------------------------------------------------------------
+# 8) ROOT TYPE: QUERY (read operations)
+# -----------------------------------------------------------------------------
+type Query {
+    """Fetches a single post by id. Returns errors[] if not found (partial result)."""
+    post(id: ID!): Post
+
+    """
+    A list of posts. ARGUMENT + OFFSET PAGINATION example:
+    - filter: optional filtering
+    - limit/offset: pagination (the Relay cursor pattern is explained in the README)
+    """
+    posts(filter: PostFilter, limit: Int = 10, offset: Int = 0): [Post!]!
+
+    """Fetches an author by id."""
+    author(id: ID!): Author
+
+    """All authors."""
+    authors: [Author!]!
+
+    """INTERFACE return: any Node (Author/Post/Comment) by id."""
+    node(id: ID!): Node
+
+    """UNION return: searches the term in titles/names/comments."""
+    search(term: String!): [SearchResult!]!
+}
+
+
+# -----------------------------------------------------------------------------
+# 9) ROOT TYPE: MUTATION (write operations)
+# -----------------------------------------------------------------------------
+type Mutation {
+    """Creates a new post (uses INPUT TYPE + the currentUser from GraphQLContext)."""
+    createPost(input: CreatePostInput!): Post!
+
+    """Publishes a post (DRAFT -> PUBLISHED)."""
+    publishPost(id: ID!): Post!
+
+    """Adds a comment. This operation also triggers the 'commentAdded' subscription."""
+    addComment(input: AddCommentInput!): Comment!
+}
+
+
+# -----------------------------------------------------------------------------
+# 10) ROOT TYPE: SUBSCRIPTION (real-time, over WebSocket)
+# -----------------------------------------------------------------------------
+type Subscription {
+    """Publishes an event whenever a new comment is added to the given post."""
+    commentAdded(postId: ID!): Comment!
+}
